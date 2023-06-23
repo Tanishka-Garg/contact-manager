@@ -1,14 +1,14 @@
 const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
-const signpUser = asyncHandler(async (req, res) => {
+const signupUser = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) {
     res.status(400);
     throw new Error("fill all fields");
   }
-
   const userAvailable = await User.findOne({ email });
   if (userAvailable) {
     res.status(400);
@@ -30,15 +30,38 @@ const signpUser = asyncHandler(async (req, res) => {
 
 //@route POST authorized user api/user
 const loginUser = asyncHandler(async (req, res) => {
-  res.json({ message: "user login" });
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400);
+    throw new Error("fill all fields");
+  }
+  const user = await User.findOne({ email });
+  // console.log(user.email);
+  if (user && (await bcrypt.compare(password, user.password))) {
+    const accessToken = jwt.sign(
+      {
+        user: {
+          username: user.username,
+          email: user.email,
+          id: user.id,
+        },
+      },
+      process.env.ACCESS_TOKEN_STRING,
+      { expiresIn: "1h" }
+    );
+    res.status(200).json({ accessToken });
+  } else {
+    res.status(401);
+    throw new Error("invalid email or password");
+  }
 });
 
 const currentUser = asyncHandler(async (req, res) => {
-  res.json({ message: "current user info" });
+  res.json(req.user);
 });
 
 module.exports = {
   loginUser,
-  signpUser,
+  signupUser,
   currentUser,
 };
